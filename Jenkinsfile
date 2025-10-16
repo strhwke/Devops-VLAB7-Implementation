@@ -7,6 +7,7 @@ pipeline {
     KUBE_NAMESPACE = "myapp"
     KUBE_DEPLOY_PREFIX = "myapp-"
     APP_NAME = "myapp"
+    KUBECONFIG = "/var/lib/jenkins/.kube/config"
   }
   options {
     timestamps()
