@@ -2,7 +2,6 @@ pipeline {
   agent any
   environment {
     DOCKERHUB_USER = credentials('dockerhub-user')
-    DOCKERHUB_PASS = credentials('dockerhub-pass')
     IMAGE = "archisman04/myapp:${BUILD_NUMBER}"
     COLOR = "green" // can be parameterized
     KUBE_NAMESPACE = "myapp"
@@ -27,8 +26,10 @@ pipeline {
     }
     stage('Push Image') {
       steps {
-        sh 'echo ${DOCKERHUB_PASS_PSW} | docker login -u ${DOCKERHUB_USER_USR} --password-stdin'
-        sh 'docker push ${IMAGE}'
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-user', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+          sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
+          sh 'docker push ${IMAGE}'
+        }
       }
     }
     stage('Deploy to Kubernetes') {
