@@ -42,7 +42,8 @@ pipeline {
     stage('Switch Service') {
       steps {
         input message: "Switch traffic to ${COLOR} version?", ok: 'Proceed'
-        sh 'kubectl -n ${KUBE_NAMESPACE} patch service ${APP_NAME}-service --type=merge -p "{\"spec\":{\"selector\":{\"app\":\"${APP_NAME}\",\"color\":\"${COLOR}\"}}}"'
+        writeFile file: 'svc-patch.json', text: """{"spec":{"selector":{"app":"${APP_NAME}","color":"${COLOR}"}}}"""
+        sh 'kubectl -n ${KUBE_NAMESPACE} patch service ${APP_NAME}-service --type=merge --patch-file svc-patch.json'
       }
     }
   }
