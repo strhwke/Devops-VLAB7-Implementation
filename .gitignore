@@ -1,0 +1,28 @@
+# Node
+app/node_modules/
+npm-debug.log*
+
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate*
+
+# Ansible
+*.retry
+
+# OS/Editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Misc
+*.pem
+*.pub
+.env
+*.env
+**/.env
+.env.local
+.env.*.local
+app/.env
+

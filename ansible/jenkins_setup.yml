@@ -1,0 +1,148 @@
+---
+- hosts: jenkins
+  become: yes
+  vars:
+    jenkins_http_port: 8080
+    docker_group: docker
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - openjdk-17-jre-headless
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - git
+          - maven
+        state: present
+
+    - name: Add Jenkins repo key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+        state: present
+
+    - name: Add Jenkins repository
+      apt_repository:
+        repo: deb https://pkg.jenkins.io/debian-stable binary/
+        state: present
+
+    - name: Install Jenkins
+      apt:
+        name: jenkins
+        state: present
+        update_cache: yes
+
+    - name: Install Docker
+      apt:
+        name:
+          - docker.io
+        state: present
+
+    - name: Add jenkins user to docker group
+      user:
+        name: jenkins
+        groups: "{{ docker_group }}"
+        append: yes
+
+    - name: Add ubuntu user to docker group (for local cluster ops)
+      user:
+        name: ubuntu
+        groups: "{{ docker_group }}"
+        append: yes
+
+    - name: Enable and start Docker
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Download kubectl
+      get_url:
+        url: https://storage.googleapis.com/kubernetes-release/release/v1.29.4/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    - name: Download eksctl
+      get_url:
+        url: https://github.com/weaveworks/eksctl/releases/download/v0.180.0/eksctl_Linux_amd64.tar.gz
+        dest: /tmp/eksctl.tar.gz
+
+    - name: Extract eksctl
+      unarchive:
+        src: /tmp/eksctl.tar.gz
+        dest: /usr/local/bin/
+        remote_src: yes
+
+    - name: Download minikube
+      get_url:
+        url: https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        dest: /usr/local/bin/minikube
+        mode: '0755'
+
+    - name: Start minikube with Docker driver (may take several minutes)
+      become: yes
+      shell: |
+        minikube start --driver=docker --wait=true --force
+      args:
+        creates: /root/.kube/config
+
+    - name: Ensure jenkins kube directory exists
+      file:
+        path: /var/lib/jenkins/.kube
+        state: directory
+        owner: jenkins
+        group: jenkins
+        mode: '0755'
+
+    - name: Copy kubeconfig to jenkins user
+      copy:
+        src: /home/ubuntu/.kube/config
+        dest: /var/lib/jenkins/.kube/config
+        remote_src: yes
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+
+    - name: Copy Kubernetes manifests to server
+      copy:
+        src: ../k8s/
+        dest: /opt/myapp/k8s/
+        owner: jenkins
+        group: jenkins
+        mode: '0644'
+
+    - name: Apply namespace
+      become: yes
+      shell: KUBECONFIG=/var/lib/jenkins/.kube/config kubectl apply -f /opt/myapp/k8s/namespace.yaml
+
+    - name: Apply blue deployment
+      become: yes
+      shell: KUBECONFIG=/var/lib/jenkins/.kube/config kubectl apply -f /opt/myapp/k8s/deployment-blue.yaml
+
+    - name: Apply green deployment
+      become: yes
+      shell: KUBECONFIG=/var/lib/jenkins/.kube/config kubectl apply -f /opt/myapp/k8s/deployment-green.yaml
+
+    - name: Apply service
+      become: yes
+      shell: KUBECONFIG=/var/lib/jenkins/.kube/config kubectl apply -f /opt/myapp/k8s/service.yaml
+
+    - name: Ensure Jenkins is started
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Print initial admin password path
+      debug:
+        msg: "/var/lib/jenkins/secrets/initialAdminPassword"
+
+
+
+
